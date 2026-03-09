@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ray2/adapter-babylon": "0.1.0",
     "@ray2/render-scene": "0.1.0",
     "@ray2/render-worker": "0.1.0",
     "@ray2/renderer-controller": "0.1.0",

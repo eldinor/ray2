@@ -2,9 +2,13 @@ import type {
   PostSnapshotMode,
   RenderSettings,
   RenderWorkerEvent,
-  SceneAdapter,
   SnapshotResult,
 } from "@ray2/render-scene";
+import {
+  BabylonExampleSceneHostAdapter,
+  createBabylonExampleSceneHost,
+  type BabylonExampleSceneHost,
+} from "@ray2/adapter-babylon";
 import { createRenderWorkerClient, postInitializeMessage } from "@ray2/render-worker";
 import { createRendererController } from "@ray2/renderer-controller";
 import {
@@ -13,11 +17,6 @@ import {
   type ExampleSceneId,
   type ViewerUiModel,
 } from "@ray2/ui-model";
-
-import {
-  EXAMPLE_SCENE_PRESETS,
-  createExampleSnapshot,
-} from "../examples/example-scenes";
 import { createToolbar, type ToolbarRefs } from "../ui/create-toolbar";
 import {
   createViewportPanel,
@@ -31,38 +30,31 @@ interface ViewerDomRefs {
   viewport: ViewportPanelRefs;
 }
 
-interface DemoSceneState {
-  selectedSceneId: ExampleSceneId;
-  viewportElement: HTMLElement;
-  lifecycleState: "live" | "paused" | "disposed";
-}
-
 export function bootstrapViewer(): HTMLElement {
   const uiModel: ViewerUiModel = structuredClone(DEFAULT_VIEWER_UI_MODEL);
   const dom = createViewerLayout(uiModel);
-  const sceneState: DemoSceneState = {
-    selectedSceneId: uiModel.exampleSceneId,
-    viewportElement: dom.viewport.viewportSurface,
-    lifecycleState: "live",
-  };
+  const sceneHost = createBabylonExampleSceneHost({
+    canvas: dom.viewport.sourceCanvas,
+    initialSceneId: uiModel.exampleSceneId,
+  });
   const worker = new Worker(new URL("../workers/render-worker.ts", import.meta.url), {
     type: "module",
   });
   const workerClient = createRenderWorkerClient(worker);
   const controller = createRendererController({
-    scene: sceneState,
-    adapter: createDemoSceneAdapter(),
+    scene: sceneHost,
+    adapter: new BabylonExampleSceneHostAdapter(),
     workerClient,
     workerEvents: workerClient,
     lifecycleController: {
       resume(scene) {
-        scene.lifecycleState = "live";
+        return scene.resume();
       },
       pause(scene) {
-        scene.lifecycleState = "paused";
+        scene.pause();
       },
       dispose(scene) {
-        scene.lifecycleState = "disposed";
+        scene.disposeScene();
       },
     },
   });
@@ -88,6 +80,7 @@ export function bootstrapViewer(): HTMLElement {
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
 
+    sceneHost.resize(width, height);
     controller.setRenderSettings({ width, height });
     uiModel.renderSettings.width = width;
     uiModel.renderSettings.height = height;
@@ -104,7 +97,7 @@ export function bootstrapViewer(): HTMLElement {
 
   controller.subscribe((state) => {
     uiModel.postSnapshotMode = state.postSnapshotMode;
-    uiModel.exampleSceneId = sceneState.selectedSceneId;
+    uiModel.exampleSceneId = sceneHost.sceneId;
     uiModel.renderSettings.samples = state.renderSettings.samples;
     uiModel.renderSettings.maxBounces = state.renderSettings.maxBounces;
     uiModel.renderSettings.width = state.renderSettings.width;
@@ -112,7 +105,7 @@ export function bootstrapViewer(): HTMLElement {
     uiModel.renderSettings.fireflyClamp = state.renderSettings.fireflyClamp;
     uiModel.renderSettings.exposure = state.renderSettings.exposure;
     uiModel.renderSettings.tonemapping = state.renderSettings.tonemapping;
-    uiModel.stats.sceneLabel = EXAMPLE_SCENE_PRESETS[sceneState.selectedSceneId].label;
+    uiModel.stats.sceneLabel = sceneHost.getSceneLabel();
     uiModel.stats.resolutionLabel = `${state.renderSettings.width} x ${state.renderSettings.height}`;
 
     const snapshotWarnings = state.lastSnapshot?.warnings ?? [];
@@ -137,8 +130,19 @@ export function bootstrapViewer(): HTMLElement {
     syncPostSnapshotSelect(dom.toolbar, state.postSnapshotMode);
     syncReferenceImage(dom.viewport, state.lastSnapshot?.referenceImage ?? null);
     renderWarnings(dom.viewport, uiModel.stats.warnings);
-    renderViewportMessage(dom.viewport, state, currentComparisonMode, currentBlendFactor);
-    renderComparisonMode(dom.viewport, currentComparisonMode, currentBlendFactor);
+    renderViewportMessage(
+      dom.viewport,
+      state,
+      currentComparisonMode,
+      currentBlendFactor,
+    );
+    renderComparisonMode(
+      dom.viewport,
+      state.sceneLifecycleState,
+      currentComparisonMode,
+      currentBlendFactor,
+      latestSampleCount > 0,
+    );
   });
 
   workerClient.subscribe((event) => {
@@ -159,12 +163,27 @@ export function bootstrapViewer(): HTMLElement {
   });
 
   dom.toolbar.exampleSceneSelect.addEventListener("change", () => {
-    sceneState.selectedSceneId = dom.toolbar.exampleSceneSelect.value as ExampleSceneId;
-    uiModel.exampleSceneId = sceneState.selectedSceneId;
+    const nextSceneId = dom.toolbar.exampleSceneSelect.value as ExampleSceneId;
+    uiModel.exampleSceneId = nextSceneId;
     latestElapsedMs = 0;
     latestSampleCount = 0;
     controller.reset();
     syncReferenceImage(dom.viewport, null);
+    uiModel.stats.warnings = ["Loading Babylon example scene..."];
+    void sceneHost.loadScene(nextSceneId).then(
+      () => {
+        uiModel.stats.sceneLabel = sceneHost.getSceneLabel();
+        uiModel.stats.warnings = [
+          sceneHost.getSceneDescription(),
+          ...sceneHost.getSceneWarnings(),
+        ].slice(0, 6);
+        renderUiState();
+      },
+      (error: unknown) => {
+        uiModel.stats.warnings = [toErrorMessage(error)];
+        renderUiState();
+      },
+    );
     renderUiState();
   });
 
@@ -219,6 +238,24 @@ export function bootstrapViewer(): HTMLElement {
   });
 
   syncViewportSize();
+  uiModel.stats.sceneLabel = sceneHost.getSceneLabel();
+  uiModel.stats.warnings = [
+    "Loading Babylon example scene...",
+  ];
+  void sceneHost.ensureReady().then(
+    () => {
+      uiModel.stats.sceneLabel = sceneHost.getSceneLabel();
+      uiModel.stats.warnings = [
+        sceneHost.getSceneDescription(),
+        ...sceneHost.getSceneWarnings(),
+      ].slice(0, 6);
+      renderUiState();
+    },
+    (error: unknown) => {
+      uiModel.stats.warnings = [toErrorMessage(error)];
+      renderUiState();
+    },
+  );
   renderUiState();
 
   return dom.shell;
@@ -254,7 +291,13 @@ export function bootstrapViewer(): HTMLElement {
       currentComparisonMode,
       currentBlendFactor,
     );
-    renderComparisonMode(dom.viewport, currentComparisonMode, currentBlendFactor);
+    renderComparisonMode(
+      dom.viewport,
+      controller.getState().sceneLifecycleState,
+      currentComparisonMode,
+      currentBlendFactor,
+      latestSampleCount > 0,
+    );
   }
 
   function syncReferenceImage(
@@ -314,17 +357,6 @@ function createViewerLayout(model: ViewerUiModel): ViewerDomRefs {
   };
 }
 
-function createDemoSceneAdapter(): SceneAdapter<DemoSceneState> {
-  return {
-    async extractSnapshot(scene): Promise<SnapshotResult> {
-      const rect = scene.viewportElement.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      return createExampleSnapshot(scene.selectedSceneId, width, height);
-    },
-  };
-}
-
 function sanitizePositiveInteger(value: string, fallback: number): number {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -370,14 +402,14 @@ function updateToolbarNumericFields(
 function renderViewportMessage(
   viewport: ViewportPanelRefs,
   state: ReturnType<
-    ReturnType<typeof createRendererController<DemoSceneState>>["getState"]
+    ReturnType<typeof createRendererController<BabylonExampleSceneHost>>["getState"]
   >,
   comparisonMode: ComparisonMode,
   blendFactor: number,
 ): void {
   const base = state.lastSnapshot
     ? `Snapshot ready at ${state.lastSnapshot.width} x ${state.lastSnapshot.height}.`
-    : "Render click will capture a snapshot and send it to the worker.";
+    : "Live Babylon preview is visible. Render will capture a snapshot and send it to the worker.";
 
   const modeText =
     comparisonMode === "blend"
@@ -389,33 +421,62 @@ function renderViewportMessage(
 
 function renderComparisonMode(
   viewport: ViewportPanelRefs,
+  sceneLifecycleState: "live" | "paused" | "disposed",
   comparisonMode: ComparisonMode,
   blendFactor: number,
+  hasRenderSamples: boolean,
 ): void {
   const renderAlpha = Math.max(0, Math.min(1, blendFactor / 100));
   const hasReference = viewport.referenceImage.hasAttribute("src");
+  const hasLiveSource = sceneLifecycleState === "live";
+  const useLiveBabylon = hasLiveSource;
 
-  viewport.placeholderOverlay.style.opacity = hasReference ? "0" : "1";
+  viewport.placeholderOverlay.style.opacity =
+    hasReference || hasLiveSource ? "0" : "1";
+  viewport.sourceCanvas.style.opacity = "0";
+  viewport.sourceCanvas.style.mixBlendMode = "normal";
   viewport.referenceImage.style.mixBlendMode = "normal";
   viewport.renderCanvas.style.mixBlendMode = "normal";
 
   switch (comparisonMode) {
     case "babylon-only":
-      viewport.referenceImage.style.opacity = "1";
+      viewport.sourceCanvas.style.opacity = useLiveBabylon ? "1" : "0";
+      viewport.referenceImage.style.opacity = useLiveBabylon
+        ? "0"
+        : hasReference
+          ? "1"
+          : "0";
       viewport.renderCanvas.style.opacity = "0";
       break;
     case "path-tracer-only":
+      viewport.sourceCanvas.style.opacity = "0";
       viewport.referenceImage.style.opacity = "0";
-      viewport.renderCanvas.style.opacity = "1";
+      viewport.renderCanvas.style.opacity = hasRenderSamples ? "1" : "0";
       break;
     case "blend":
-      viewport.referenceImage.style.opacity = "1";
-      viewport.renderCanvas.style.opacity = `${renderAlpha}`;
+      viewport.sourceCanvas.style.opacity = useLiveBabylon ? "1" : "0";
+      viewport.referenceImage.style.opacity = useLiveBabylon
+        ? "0"
+        : hasReference
+          ? "1"
+          : "0";
+      viewport.renderCanvas.style.opacity =
+        hasRenderSamples && (useLiveBabylon || hasReference)
+          ? `${renderAlpha}`
+          : "0";
       break;
     case "difference":
-      viewport.referenceImage.style.opacity = "1";
-      viewport.renderCanvas.style.opacity = "1";
-      viewport.renderCanvas.style.mixBlendMode = "difference";
+      viewport.sourceCanvas.style.opacity = useLiveBabylon ? "1" : "0";
+      viewport.referenceImage.style.opacity = useLiveBabylon
+        ? "0"
+        : hasReference
+          ? "1"
+          : "0";
+      viewport.renderCanvas.style.opacity =
+        hasRenderSamples && (useLiveBabylon || hasReference) ? "1" : "0";
+      if (hasRenderSamples && (useLiveBabylon || hasReference)) {
+        viewport.renderCanvas.style.mixBlendMode = "difference";
+      }
       break;
   }
 }
@@ -433,6 +494,15 @@ function toReferenceBlob(
 
   return null;
 }
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unknown viewer error.";
+}
+
 function formatModeLabel(mode: ComparisonMode): string {
   switch (mode) {
     case "babylon-only":

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "8.54.1",
+    "@babylonjs/loaders": "8.54.1",
     "@ray2/render-scene": "0.1.0"
   }
 }

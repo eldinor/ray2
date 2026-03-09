@@ -22,7 +22,7 @@ export interface WebGpuDeviceLike extends RenderCoreDeviceLike {
   readonly label?: string;
 }
 
-interface NavigatorWithWebGpu extends Navigator {
+interface NavigatorWithWebGpu {
   gpu?: {
     requestAdapter(): Promise<WebGpuAdapterLike | null>;
     getPreferredCanvasFormat?(): string;
@@ -32,7 +32,7 @@ interface NavigatorWithWebGpu extends Navigator {
 export async function initializeWebGpu(
   canvas?: OffscreenCanvas,
 ): Promise<WebGpuContext> {
-  const workerNavigator = navigator as NavigatorWithWebGpu;
+  const workerNavigator = navigator as Navigator & NavigatorWithWebGpu;
 
   if (!workerNavigator.gpu) {
     return {
@@ -45,7 +45,7 @@ export async function initializeWebGpu(
     };
   }
 
-  const adapter = await workerNavigator.gpu.requestAdapter();
+  const adapter = (await workerNavigator.gpu.requestAdapter()) ?? null;
   const device = adapter ? await adapter.requestDevice() : null;
   const canvasContext =
     canvas?.getContext("webgpu") as WebGpuCanvasContextLike | null;

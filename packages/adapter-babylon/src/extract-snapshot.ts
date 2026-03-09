@@ -18,6 +18,7 @@ import type {
 
 import { mapMaterial } from "./material-mapper";
 import { captureScreenshot } from "./screenshot";
+import type { BabylonExampleSceneHost } from "./example-scene-host";
 
 function createEmptyRenderScene(): RenderScene {
   return {
@@ -73,6 +74,10 @@ export async function extractSnapshot(scene: Scene): Promise<SnapshotResult> {
   for (const abstractMesh of scene.meshes) {
     if (!(abstractMesh instanceof Mesh)) {
       warnings.push(`Skipping non-Mesh node "${abstractMesh.name}".`);
+      continue;
+    }
+
+    if (abstractMesh.name === "__root__" || abstractMesh.id === "__root__") {
       continue;
     }
 
@@ -159,6 +164,30 @@ export async function extractSnapshot(scene: Scene): Promise<SnapshotResult> {
 export class BabylonSceneAdapter implements SceneAdapter<Scene> {
   extractSnapshot(scene: Scene): Promise<SnapshotResult> {
     return extractSnapshot(scene);
+  }
+}
+
+export class BabylonExampleSceneHostAdapter
+  implements SceneAdapter<BabylonExampleSceneHost>
+{
+  async extractSnapshot(host: BabylonExampleSceneHost): Promise<SnapshotResult> {
+    await host.ensureReady();
+    const snapshot = await extractSnapshot(host.getScene());
+
+    return {
+      ...snapshot,
+      warnings: [...host.getSceneWarnings(), ...snapshot.warnings],
+      scene: {
+        ...snapshot.scene,
+        metadata: {
+          source: snapshot.scene.metadata?.source ?? "babylon",
+          warnings: [
+            ...host.getSceneWarnings(),
+            ...(snapshot.scene.metadata?.warnings ?? []),
+          ],
+        },
+      },
+    };
   }
 }
 

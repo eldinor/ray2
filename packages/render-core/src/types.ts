@@ -26,7 +26,7 @@ export interface WebGpuCanvasContextLike {
 }
 
 export interface WebGpuRenderPassEncoderLike {
-  setPipeline(pipeline: WebGpuRenderPipelineLike): void;
+  setPipeline(pipeline: unknown): void;
   setBindGroup(index: number, bindGroup: unknown): void;
   draw(
     vertexCount: number,
@@ -55,10 +55,6 @@ export interface WebGpuBufferLike {
   destroy?(): void;
 }
 
-export interface WebGpuRenderPipelineLike {
-  readonly __brand?: "WebGpuRenderPipelineLike";
-}
-
 export interface WebGpuDeviceLike {
   queue: WebGpuQueueLike;
   createShaderModule(descriptor: { code: string }): unknown;
@@ -66,7 +62,7 @@ export interface WebGpuDeviceLike {
   createBindGroupLayout(descriptor: object): unknown;
   createBindGroup(descriptor: object): unknown;
   createPipelineLayout(descriptor: object): unknown;
-  createRenderPipeline(descriptor: object): WebGpuRenderPipelineLike;
+  createRenderPipeline(descriptor: object): unknown;
   createCommandEncoder(): WebGpuCommandEncoderLike;
   destroy?(): void;
 }

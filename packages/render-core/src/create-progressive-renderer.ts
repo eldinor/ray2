@@ -7,7 +7,6 @@ import type {
   WebGpuBufferLike,
   WebGpuCanvasContextLike,
   WebGpuDeviceLike,
-  WebGpuRenderPipelineLike,
 } from "./types";
 
 // The WGSL uniform struct is padded to 64 bytes because it contains a vec3f.
@@ -134,7 +133,7 @@ function createPipeline(
   device: WebGpuDeviceLike,
   bindGroupLayout: unknown,
   format: string,
-): WebGpuRenderPipelineLike {
+): unknown {
   const shaderModule = device.createShaderModule({
     code: FULLSCREEN_SHADER,
   });

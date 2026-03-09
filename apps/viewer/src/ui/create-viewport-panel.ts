@@ -4,6 +4,7 @@ export interface ViewportPanelRefs {
   root: HTMLElement;
   modeBadge: HTMLElement;
   viewportSurface: HTMLElement;
+  sourceCanvas: HTMLCanvasElement;
   renderCanvas: HTMLCanvasElement;
   referenceImage: HTMLImageElement;
   placeholderOverlay: HTMLElement;
@@ -30,6 +31,7 @@ export function createViewportPanel(model: ViewerUiModel): ViewportPanelRefs {
       </div>
       <div class="viewport-grid">
         <div class="viewport-frame" data-role="viewport-surface">
+          <canvas class="viewport-source-canvas" data-role="source-canvas" aria-hidden="true"></canvas>
           <img class="viewport-reference" data-role="reference-image" alt="Reference render" />
           <canvas class="viewport-canvas" data-role="render-canvas"></canvas>
           <div class="viewport-placeholder" data-role="placeholder-overlay">
@@ -75,6 +77,7 @@ export function createViewportPanel(model: ViewerUiModel): ViewportPanelRefs {
     root: panel,
     modeBadge: requireElement(panel, '[data-role="mode-badge"]'),
     viewportSurface: requireElement(panel, '[data-role="viewport-surface"]'),
+    sourceCanvas: requireElement(panel, '[data-role="source-canvas"]'),
     renderCanvas: requireElement(panel, '[data-role="render-canvas"]'),
     referenceImage: requireElement(panel, '[data-role="reference-image"]'),
     placeholderOverlay: requireElement(panel, '[data-role="placeholder-overlay"]'),
