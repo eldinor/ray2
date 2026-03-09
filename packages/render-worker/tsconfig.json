@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ES2022", "DOM", "WebWorker"],
+    "tsBuildInfoFile": "../../node_modules/.tmp/render-worker.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"]
+}

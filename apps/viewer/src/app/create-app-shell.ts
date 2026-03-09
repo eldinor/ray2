@@ -1,17 +1,30 @@
+import { DEFAULT_VIEWER_UI_MODEL } from "@ray2/ui-model";
+
+import { createToolbar } from "../ui/create-toolbar";
+import { createViewportPanel } from "../ui/create-viewport-panel";
+
 export function createAppShell(): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "app-shell";
 
-  shell.innerHTML = `
-    <section class="hero">
+  const topbar = document.createElement("header");
+  topbar.className = "topbar";
+  topbar.innerHTML = `
+    <div>
       <p class="eyebrow">Ray2</p>
-      <h1>Viewer workspace is ready for renderer integration.</h1>
-      <p class="description">
-        Task 1 scaffolding is in place. The next steps are the neutral scene
-        contracts and adapter packages.
-      </p>
-    </section>
+      <h1 class="title">Unified viewport shell</h1>
+    </div>
+    <p class="status-pill">Task 6</p>
   `;
+
+  const workspace = document.createElement("section");
+  workspace.className = "workspace";
+
+  const toolbar = createToolbar(DEFAULT_VIEWER_UI_MODEL);
+  const viewportPanel = createViewportPanel(DEFAULT_VIEWER_UI_MODEL);
+
+  workspace.append(toolbar, viewportPanel);
+  shell.append(topbar, workspace);
 
   return shell;
 }

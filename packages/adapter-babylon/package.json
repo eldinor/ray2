@@ -1,0 +1,13 @@
+{
+  "name": "@ray2/adapter-babylon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@babylonjs/core": "8.54.1",
+    "@ray2/render-scene": "0.1.0"
+  }
+}

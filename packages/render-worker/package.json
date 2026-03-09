@@ -1,0 +1,13 @@
+{
+  "name": "@ray2/render-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ray2/render-scene": "0.1.0",
+    "@ray2/renderer-controller": "0.1.0"
+  }
+}
