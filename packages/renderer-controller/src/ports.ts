@@ -12,6 +12,7 @@ export interface RenderWorkerClient {
 }
 
 export interface SceneLifecycleController<TScene> {
+  resume?(scene: TScene): Promise<void> | void;
   pause?(scene: TScene): Promise<void> | void;
   dispose?(scene: TScene): Promise<void> | void;
 }

@@ -14,6 +14,8 @@ export interface RenderSettings {
   samples: number;
   maxBounces: number;
   fireflyClamp?: number;
+  exposure?: number;
+  tonemapping?: "none" | "reinhard" | "aces";
   denoiserEnabled?: boolean;
   environmentIntensity?: number;
 }

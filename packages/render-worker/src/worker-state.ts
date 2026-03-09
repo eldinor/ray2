@@ -10,6 +10,7 @@ export interface RenderWorkerState {
   referenceHeight: number;
   sampleCount: number;
   startedAtMs: number | null;
+  renderTimer: number | null;
 }
 
 export function createInitialWorkerState(): RenderWorkerState {
@@ -21,5 +22,6 @@ export function createInitialWorkerState(): RenderWorkerState {
     referenceHeight: 0,
     sampleCount: 0,
     startedAtMs: null,
+    renderTimer: null,
   };
 }

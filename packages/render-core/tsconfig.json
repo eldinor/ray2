@@ -3,7 +3,7 @@
   "compilerOptions": {
     "composite": true,
     "lib": ["ES2022", "DOM", "WebWorker"],
-    "tsBuildInfoFile": "../../node_modules/.tmp/render-worker.tsbuildinfo"
+    "tsBuildInfoFile": "../../node_modules/.tmp/render-core.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "../render-core/src/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

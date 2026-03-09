@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@ray2/render-core": "0.1.0",
     "@ray2/render-scene": "0.1.0",
     "@ray2/renderer-controller": "0.1.0"
   }

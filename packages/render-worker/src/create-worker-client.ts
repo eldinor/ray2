@@ -67,8 +67,15 @@ export function postInitializeMessage(
   worker: Worker,
   canvas?: OffscreenCanvas,
 ): void {
-  worker.postMessage({
+  const message: RenderWorkerRequest = {
     type: "initialize",
     canvas,
-  });
+  };
+
+  if (canvas) {
+    worker.postMessage(message, [canvas]);
+    return;
+  }
+
+  worker.postMessage(message);
 }

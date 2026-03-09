@@ -3,7 +3,10 @@ import type {
   RenderWorkerRequest,
 } from "@ray2/render-scene";
 
-import { createInitialWorkerState, type RenderWorkerState } from "./worker-state";
+import {
+  createInitialWorkerState,
+  type RenderWorkerState,
+} from "./worker-state";
 import { initializeWebGpu } from "./webgpu-init";
 
 export interface WorkerMessageHandler {
@@ -32,24 +35,45 @@ export function createWorkerMessageHandler(
             state.referenceWidth = message.referenceWidth;
             state.referenceHeight = message.referenceHeight;
             state.sampleCount = 0;
+            state.context?.renderer?.loadScene(message.scene, message.settings);
             break;
           }
 
           case "startRender": {
-            state.currentSettings = message.settings;
-            state.sampleCount += 1;
-            state.startedAtMs ??= Date.now();
+            if (!state.currentScene) {
+              throw new Error("Cannot start render before a scene is loaded.");
+            }
 
-            emit({
-              type: "progress",
-              sampleCount: state.sampleCount,
-              elapsedMs: Date.now() - state.startedAtMs,
-            });
-            emit({ type: "frame" });
+            state.currentSettings = message.settings;
+            state.startedAtMs = Date.now();
+            stopRenderLoop(state);
+            state.renderTimer = setInterval(() => {
+              const currentScene = state.currentScene;
+              const currentSettings = state.currentSettings;
+
+              if (!currentScene || !currentSettings) {
+                return;
+              }
+
+              state.sampleCount += 1;
+              state.context?.renderer?.renderSample({
+                scene: currentScene,
+                settings: currentSettings,
+                sampleCount: state.sampleCount,
+              });
+
+              emit({
+                type: "progress",
+                sampleCount: state.sampleCount,
+                elapsedMs: Date.now() - (state.startedAtMs ?? Date.now()),
+              });
+              emit({ type: "frame" });
+            }, 120) as unknown as number;
             break;
           }
 
           case "reset": {
+            stopRenderLoop(state);
             state.currentScene = null;
             state.currentSettings = null;
             state.referenceWidth = 0;
@@ -60,6 +84,8 @@ export function createWorkerMessageHandler(
           }
 
           case "dispose": {
+            stopRenderLoop(state);
+            state.context?.renderer?.dispose();
             state.context = null;
             state.currentScene = null;
             state.currentSettings = null;
@@ -97,4 +123,11 @@ function toErrorMessage(error: unknown): string {
   }
 
   return "Unknown render worker error.";
+}
+
+function stopRenderLoop(state: RenderWorkerState): void {
+  if (state.renderTimer !== null) {
+    clearInterval(state.renderTimer);
+    state.renderTimer = null;
+  }
 }

@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace viewer",
     "lint": "eslint .",
-    "typecheck": "tsc -b apps/viewer/tsconfig.json packages/render-scene/tsconfig.json packages/adapter-babylon/tsconfig.json packages/renderer-controller/tsconfig.json packages/render-worker/tsconfig.json packages/ui-model/tsconfig.json",
+    "typecheck": "tsc -b apps/viewer/tsconfig.json packages/render-scene/tsconfig.json packages/adapter-babylon/tsconfig.json packages/render-core/tsconfig.json packages/renderer-controller/tsconfig.json packages/render-worker/tsconfig.json packages/ui-model/tsconfig.json packages/render-bvh/tsconfig.json",
     "build": "npm run build --workspace viewer"
   },
   "devDependencies": {

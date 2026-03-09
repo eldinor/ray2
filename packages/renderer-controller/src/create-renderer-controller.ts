@@ -47,16 +47,17 @@ export class DefaultRendererController<TScene>
     this.adapter = options.adapter;
     this.workerClient = options.workerClient;
     this.lifecycleController = options.lifecycleController;
-    this.state = {
-      renderSettings: {
-        ...DEFAULT_RENDER_SETTINGS,
-        ...options.initialSettings,
-      },
-      postSnapshotMode: options.initialPostSnapshotMode ?? "keep",
-      isRendering: false,
-      lastSnapshot: null,
-      lastError: null,
-    };
+      this.state = {
+        renderSettings: {
+          ...DEFAULT_RENDER_SETTINGS,
+          ...options.initialSettings,
+        },
+        postSnapshotMode: options.initialPostSnapshotMode ?? "keep",
+        sceneLifecycleState: "live",
+        isRendering: false,
+        lastSnapshot: null,
+        lastError: null,
+      };
 
     options.workerEvents?.subscribe((event) => {
       if (event.type === "error") {
@@ -88,6 +89,7 @@ export class DefaultRendererController<TScene>
     });
 
     try {
+      await this.prepareSceneForSnapshot();
       const snapshot = await this.adapter.extractSnapshot(this.scene);
 
       this.updateState({
@@ -109,7 +111,9 @@ export class DefaultRendererController<TScene>
 
   reset(): void {
     this.workerClient.reset();
+    void this.lifecycleController?.resume?.(this.scene);
     this.updateState({
+      sceneLifecycleState: "live",
       isRendering: false,
       lastError: null,
     });
@@ -130,14 +134,33 @@ export class DefaultRendererController<TScene>
     });
   }
 
+  private async prepareSceneForSnapshot(): Promise<void> {
+    await this.lifecycleController?.resume?.(this.scene);
+    this.updateState({
+      sceneLifecycleState: "live",
+    });
+  }
+
   private async applyPostSnapshotMode(): Promise<void> {
     if (this.state.postSnapshotMode === "pause") {
       await this.lifecycleController?.pause?.(this.scene);
+      this.updateState({
+        sceneLifecycleState: "paused",
+      });
+      return;
     }
 
     if (this.state.postSnapshotMode === "dispose") {
       await this.lifecycleController?.dispose?.(this.scene);
+      this.updateState({
+        sceneLifecycleState: "disposed",
+      });
+      return;
     }
+
+    this.updateState({
+      sceneLifecycleState: "live",
+    });
   }
 
   private async loadSnapshot(snapshot: SnapshotResult): Promise<void> {
